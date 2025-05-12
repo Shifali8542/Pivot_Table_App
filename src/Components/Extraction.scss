@@ -1,0 +1,64 @@
+.extraction-container {
+  display: flex;
+  flex-direction: row;
+  width: 100vw; // Use viewport width to ensure full coverage
+  height: 100vh;
+  background-color: #e4e9f0;
+  font-family: 'Inter', sans-serif;
+  overflow: hidden; // Prevent any scrolling
+  box-sizing: border-box;
+}
+
+.pivot-section,
+.pdf-section {
+  flex: 1 0 50%; // Take exactly 50% width, no shrinking
+  width: 50%;
+  max-width: 50%; // Enforce maximum width to prevent overflow
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto; // Allow vertical scrolling only
+  overflow-x: hidden; // Prevent horizontal scrolling
+  transition: background-color 0.3s ease;
+  box-sizing: border-box;
+}
+
+.pivot-section {
+  border-right: 2px solid #d1d9e0;
+  background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+
+  &:hover {
+    background: linear-gradient(to bottom, #f8fafc 0%, #edf2ff 100%);
+  }
+}
+
+.pdf-section {
+  background: linear-gradient(to bottom, #ffffff 0%, #f8fafc 100%);
+
+  &:hover {
+    background: linear-gradient(to bottom, #f8fafc 0%, #edf2ff 100%);
+  }
+}
+
+/* Scrollbar customization for vertical scrolling */
+.pivot-section::-webkit-scrollbar,
+.pdf-section::-webkit-scrollbar {
+  width: 10px;
+}
+
+.pivot-section::-webkit-scrollbar-track,
+.pdf-section::-webkit-scrollbar-track {
+  background: #e4e9f0;
+  border-radius: 5px;
+}
+
+.pivot-section::-webkit-scrollbar-thumb,
+.pdf-section::-webkit-scrollbar-thumb {
+  background: #4a90e2;
+  border-radius: 5px;
+  transition: background 0.3s ease;
+}
+
+.pivot-section::-webkit-scrollbar-thumb:hover,
+.pdf-section::-webkit-scrollbar-thumb:hover {
+  background: #3a78c2;
+}
