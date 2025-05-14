@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, memo } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import 'pdfjs-dist/web/pdf_viewer.css';
 import './pdf.scss';
@@ -9,9 +9,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.j
 interface PdfViewerProps {
   onRenderStatus?: (status: boolean) => void;
   navigateTo?: { page: number; ltrb: [number, number, number, number] } | null;
+  pdfFileName: string;
 }
 
-const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => {
+const PdfViewer: React.FC<PdfViewerProps> = memo(({ onRenderStatus, navigateTo, pdfFileName }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const pdfViewerRef = useRef<HTMLDivElement>(null);
   const pdfInstanceRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
@@ -30,29 +31,45 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
     top: number;
     values: [number, number, number, number];
   } | null>(null);
-  const pdfUrl = '/Sample.pdf';
-  const pdfLocation = 'public/Sample.pdf';
-  // Track highlighted elements to toggle them
+  const [nonHighlightablePages, setNonHighlightablePages] = useState<number[]>([]);
+  const pdfUrl = `/f_Apax VIII_2017Q2 PTF.pdf`;
+  const pdfLocation = `public/f_Apax VIII_2017Q2 PTF.pdf`;
   const highlightedElementsRef = useRef<Set<HTMLElement>>(new Set());
+  const isMountedRef = useRef<boolean>(false);
 
   // Load PDF
   useEffect(() => {
+    isMountedRef.current = true;
+
     const loadPDF = async () => {
       try {
+        if (!isMountedRef.current) return;
+
         const container = containerRef.current;
-        if (!container) throw new Error('Container ref is not assigned');
+        if (!container) {
+          throw new Error('Container ref is not assigned. Component may have unmounted.');
+        }
 
         const pdfResponse = await fetch(pdfUrl, { method: 'HEAD' });
-        if (!pdfResponse.ok) throw new Error(`PDF not found at ${pdfUrl}. Status: ${pdfResponse.status}.`);
+        if (!pdfResponse.ok) {
+          throw new Error(
+            `PDF not found at ${pdfUrl}. Status: ${pdfResponse.status}. ` +
+            `Please ensure the file '${pdfFileName}' exists in the public directory.`
+          );
+        }
 
         const loadingTask = pdfjsLib.getDocument(pdfUrl);
         const pdf = await loadingTask.promise;
+        if (!isMountedRef.current) return;
+
         pdfInstanceRef.current = pdf;
         setTotalPages(pdf.numPages);
-        renderAllPages(pdf, scale, rotation);
+        await renderAllPages(pdf, scale, rotation);
         onRenderStatus?.(true);
       } catch (error: any) {
-        const errorMessage = error.message || 'Unknown error loading PDF';
+        if (!isMountedRef.current) return;
+        const errorMessage = error.message || 'Unknown error loading PDF. Please check the file format and path.';
+        console.error('PDF Loading Error:', error);
         setHasError(errorMessage);
         onRenderStatus?.(false);
       }
@@ -61,13 +78,16 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
     loadPDF();
 
     return () => {
+      isMountedRef.current = false;
       if (pdfInstanceRef.current) pdfInstanceRef.current.destroy();
       if (containerRef.current) containerRef.current.innerHTML = '';
     };
-  }, [pdfUrl, onRenderStatus]);
+  }, [pdfUrl, onRenderStatus, scale, rotation]);
 
   // Render all pages
   const renderAllPages = async (pdf: pdfjsLib.PDFDocumentProxy, scale: number, rotation: number) => {
+    if (!isMountedRef.current) return;
+
     const container = containerRef.current;
     if (!container) return;
 
@@ -76,18 +96,19 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
     textLayersRef.current = [];
     overlaysRef.current = [];
     highlightedElementsRef.current.clear();
+    const nonHighlightable: number[] = [];
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      if (!isMountedRef.current) return;
+
       const page = await pdf.getPage(pageNum);
       const viewport = page.getViewport({ scale, rotation });
 
-      // Create page wrapper
       const pageWrapper = document.createElement('div');
       pageWrapper.className = 'pdf-page-wrapper';
       pageWrapper.style.position = 'relative';
       container.appendChild(pageWrapper);
 
-      // Create canvas
       const canvas = document.createElement('canvas');
       canvas.className = 'pdf-page-canvas';
       canvas.height = viewport.height;
@@ -95,11 +116,9 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
       pageWrapper.appendChild(canvas);
       canvasesRef.current[pageNum - 1] = canvas;
 
-      // Render PDF to canvas
       const context = canvas.getContext('2d')!;
       await page.render({ canvasContext: context, viewport }).promise;
 
-      // Create text layer
       const textLayerDiv = document.createElement('div');
       textLayerDiv.className = 'textLayer';
       textLayerDiv.style.position = 'absolute';
@@ -107,6 +126,8 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
       textLayerDiv.style.left = '0';
       textLayerDiv.style.width = `${viewport.width}px`;
       textLayerDiv.style.height = `${viewport.height}px`;
+      textLayerDiv.style.setProperty('--scale-factor', viewport.scale.toString());
+
       pageWrapper.appendChild(textLayerDiv);
       textLayersRef.current[pageNum - 1] = textLayerDiv;
 
@@ -118,7 +139,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
         textDivs: [],
       });
 
-      // Create overlay for annotations
       const overlay = document.createElement('div');
       overlay.className = 'pdf-page-overlay';
       overlay.style.position = 'absolute';
@@ -134,65 +154,62 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
       textLayerDiv.style.transform = `rotate(${rotation}deg)`;
       overlay.style.transform = `rotate(${rotation}deg)`;
 
-      // Add click handlers for word and line highlighting
       setTimeout(() => {
+        if (!isMountedRef.current) return;
         const spans = textLayerDiv.querySelectorAll('span');
-        spans.forEach(span => {
-          span.style.cursor = 'pointer';
-          span.addEventListener('click', (e) => {
-            e.stopPropagation();
-            // Toggle highlight for the word
-            if (highlightedElementsRef.current.has(span as HTMLElement)) {
-              span.style.backgroundColor = '';
-              highlightedElementsRef.current.delete(span as HTMLElement);
-            } else {
-              // Clear all highlights
-              highlightedElementsRef.current.forEach(el => {
-                el.style.backgroundColor = '';
-              });
-              highlightedElementsRef.current.clear();
-              span.style.backgroundColor = 'orange';
-              highlightedElementsRef.current.add(span as HTMLElement);
-            }
-          });
-        });
-
-        // Add click handler for the text layer to highlight the line
-        textLayerDiv.addEventListener('click', (e) => {
-          const target = e.target as HTMLElement;
-          // Only handle clicks that are not on individual spans
-          if (target.tagName.toLowerCase() !== 'span') {
-            const lineDiv = target.closest('.textLayer > div') as HTMLElement | null;
-            if (lineDiv) {
-              if (highlightedElementsRef.current.has(lineDiv)) {
-                lineDiv.querySelectorAll('span').forEach(s => {
-                  s.style.backgroundColor = '';
-                });
-                highlightedElementsRef.current.delete(lineDiv);
+        if (spans.length === 0) {
+          console.warn(`Page ${pageNum}: No text content available for highlighting.`);
+          nonHighlightable.push(pageNum);
+          textLayerDiv.style.cursor = 'not-allowed';
+        } else {
+          textLayerDiv.style.cursor = 'default';
+          spans.forEach(span => {
+            span.style.cursor = 'pointer';
+            span.addEventListener('click', (e) => {
+              e.stopPropagation();
+              if (highlightedElementsRef.current.has(span as HTMLElement)) {
+                span.style.backgroundColor = '';
+                highlightedElementsRef.current.delete(span as HTMLElement);
               } else {
-                // Clear all highlights
                 highlightedElementsRef.current.forEach(el => {
                   el.style.backgroundColor = '';
                 });
                 highlightedElementsRef.current.clear();
-                lineDiv.querySelectorAll('span').forEach(s => {
-                  s.style.backgroundColor = 'orange';
-                });
-                highlightedElementsRef.current.add(lineDiv);
+                span.style.backgroundColor = 'orange';
+                highlightedElementsRef.current.add(span as HTMLElement);
+              }
+            });
+          });
+
+          textLayerDiv.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            if (target.tagName.toLowerCase() !== 'span') {
+              const lineDiv = target.closest('.textLayer > div') as HTMLElement | null;
+              if (lineDiv) {
+                if (highlightedElementsRef.current.has(lineDiv)) {
+                  lineDiv.querySelectorAll('span').forEach(s => {
+                    s.style.backgroundColor = '';
+                  });
+                  highlightedElementsRef.current.delete(lineDiv);
+                } else {
+                  highlightedElementsRef.current.forEach(el => {
+                    el.style.backgroundColor = '';
+                  });
+                  highlightedElementsRef.current.clear();
+                  lineDiv.querySelectorAll('span').forEach(s => {
+                    s.style.backgroundColor = 'orange';
+                  });
+                  highlightedElementsRef.current.add(lineDiv);
+                }
               }
             }
-          }
-        });
-      }, 300);
+          });
+        }
+      }, 1000);
     }
-  };
 
-  // Re-render on scale or rotation change
-  useEffect(() => {
-    if (pdfInstanceRef.current) {
-      renderAllPages(pdfInstanceRef.current, scale, rotation);
-    }
-  }, [scale, rotation]);
+    setNonHighlightablePages(nonHighlightable);
+  };
 
   // Handle LTRB navigation and annotations
   useEffect(() => {
@@ -206,12 +223,36 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
 
     const addHighlightAndOverlay = async () => {
       try {
+        if (!isMountedRef.current) return;
+
         setCurrentPage(page);
-        const pageCanvas = canvasesRef.current[page - 1];
-        if (pageCanvas) pageCanvas.scrollIntoView({ behavior: 'smooth' });
+
+        // Attempt to scroll to the page
+        let pageCanvas = canvasesRef.current[page - 1];
+        if (pageCanvas) {
+          setTimeout(() => {
+            if (!isMountedRef.current) return;
+            pageCanvas!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        } else {
+          console.warn(`Canvas for page ${page} not found, re-rendering...`);
+          if (pdfInstanceRef.current) {
+            await renderAllPages(pdfInstanceRef.current, scale, rotation);
+            pageCanvas = canvasesRef.current[page - 1];
+            if (pageCanvas) {
+              setTimeout(() => {
+                if (!isMountedRef.current) return;
+                pageCanvas!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 100);
+            } else {
+              console.error(`Failed to scroll to page ${page}: Canvas not found after re-render.`);
+            }
+          }
+        }
 
         if (!pdfInstanceRef.current) {
-          throw new Error('PDF instance is not loaded');
+          console.error('PDF instance is null.');
+          return;
         }
         const pdfPage = await pdfInstanceRef.current.getPage(page);
         const viewport = pdfPage.getViewport({ scale, rotation });
@@ -311,14 +352,13 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = 'Sample.pdf';
+        link.download = pdfFileName;
         link.click();
         window.URL.revokeObjectURL(url);
       });
     }
   };
 
-  // Fullscreen change listener
   useEffect(() => {
     const handleFullscreenChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
@@ -331,7 +371,7 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
     <div className="pdf-viewer-container" ref={pdfViewerRef}>
       <nav className="pdf-toolbar">
         <button className="nav-button prev-button" onClick={prevPage} disabled={currentPage <= 1} title="Previous Page">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
@@ -339,27 +379,27 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
           <span>Page {currentPage} of {totalPages}</span>
         </div>
         <button className="nav-button next-button" onClick={nextPage} disabled={currentPage >= totalPages} title="Next Page">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
         </button>
         <button className="nav-button zoom-button zoom-in" onClick={zoomIn} disabled={scale >= 3} title="Zoom In">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zm-7-7v6m0 0H6m6 0h6" />
           </svg>
         </button>
         <button className="nav-button zoom-button zoom-out" onClick={zoomOut} disabled={scale <= 0.25} title="Zoom Out">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zm-4 0H6" />
           </svg>
         </button>
         <button className="nav-button fit-button" onClick={fitToPage} title="Fit to Page">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
           </svg>
         </button>
         <button className="nav-button rotate-button" onClick={rotateClockwise} title="Rotate Clockwise">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5m0 0l-7 7m14-7h5v5m0 0l-7-7" />
           </svg>
         </button>
@@ -373,18 +413,18 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
             max={totalPages}
           />
           <button onClick={goToPage} title="Go to Page">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
         </div>
         <button className="nav-button fullscreen-button" onClick={toggleFullscreen} title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}>
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isFullscreen ? 'M6 18L18 6M6 6l12 12' : 'M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3'} />
           </svg>
         </button>
         <button className="nav-button download-button" onClick={downloadPDF} disabled={!pdfInstanceRef.current} title="Download PDF">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 18">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
         </button>
@@ -401,6 +441,19 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
       ) : (
         <div className="pdf-container-wrapper">
           <div ref={containerRef} className="pdf-container" style={{ height: '100%', width: '100%' }} />
+          {nonHighlightablePages.includes(currentPage) && (
+            <div
+              className="ltrb-overlay"
+              style={{
+                position: 'absolute',
+                left: '50%',
+                top: '50%',
+                transform: 'translate(-50%, -50%)',
+              }}
+            >
+              Highlighting not available on this page (text not extractable).
+            </div>
+          )}
           {ltrbOverlay && (
             <div
               className="ltrb-overlay"
@@ -418,6 +471,6 @@ const PdfViewer: React.FC<PdfViewerProps> = ({ onRenderStatus, navigateTo }) => 
       )}
     </div>
   );
-};
+});
 
 export default PdfViewer;

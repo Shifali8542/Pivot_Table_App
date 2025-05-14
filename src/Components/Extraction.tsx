@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import PivotTable from './PivotTable';
 import Pdf from './Pdf';
 import rawData from '../data/sampleData.json';
@@ -24,6 +24,7 @@ const Extraction: React.FC = () => {
     page: number;
     ltrb: [number, number, number, number];
   } | null>(null);
+  const [hasLoggedRenderSuccess, setHasLoggedRenderSuccess] = useState(false);
 
   // Get tableCellsData from JSON
   const tableCellsData = flattenTableCells(
@@ -31,25 +32,28 @@ const Extraction: React.FC = () => {
   );
   const pivotData = [{ data: tableCellsData }];
 
+  // Get PDF file name from JSON
+  const pdfFileName = sampleData.PDF?.[0] || 'f_Apax VIII_2017Q2 PTF.pdf';
+
   useEffect(() => {
     setIsPivotRendered(true); // Assume pivot table renders successfully
   }, []);
 
   // Callback from Pdf component to update rendering status
-  const handlePdfRenderStatus = (status: boolean) => {
+  const handlePdfRenderStatus = useCallback((status: boolean) => {
     setIsPdfRendered(status);
-  };
+  }, []);
 
   useEffect(() => {
-    if (isPivotRendered && isPdfRendered) {
+    if (isPivotRendered && isPdfRendered && !hasLoggedRenderSuccess) {
       console.log('Both PivotTable and Pdf rendered successfully');
+      setHasLoggedRenderSuccess(true);
     }
-  }, [isPivotRendered, isPdfRendered]);
+  }, [isPivotRendered, isPdfRendered, hasLoggedRenderSuccess]);
 
   const handleCellClick = (cellId: string, ltrb: [number, number, number, number]) => {
     console.log(`Clicked Cell ID: ${cellId}`);
     console.log(`LTRB Coordinates:`, ltrb);
-    // Search the full record using the cellId
     const allData = pivotData[0]?.data || [];
     const matchingCell = allData.find((cell: any) => cell.Cell_id === cellId);
 
@@ -63,9 +67,8 @@ const Extraction: React.FC = () => {
       console.log('Raw Value:', matchingCell.Value);
       console.log('Text Value:', matchingCell.data_point_text);
 
-      // Navigate to the PDF location and add annotation
       setPdfNavigate({
-        page: matchingCell.page || 1, // Default to page 1 if not specified 
+        page: matchingCell.page || 1,
         ltrb: ltrb,
       });
     } else {
@@ -85,6 +88,7 @@ const Extraction: React.FC = () => {
         <Pdf
           onRenderStatus={handlePdfRenderStatus}
           navigateTo={pdfNavigate}
+          pdfFileName={pdfFileName}
         />
       </div>
     </div>
