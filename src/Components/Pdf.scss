@@ -34,24 +34,24 @@
 }
 
 .nav-button {
-  width: 40px;
-  height: 40px;
+  width: 44px; /* Increased from 40px */
+  height: 44px; /* Increased from 40px */
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #ffffff;
+  background: linear-gradient(145deg, #ffffff 0%, #e6e6e6 100%); /* Gradient background */
   color: #2d3748;
   border: none;
-  border-radius: 50%;
+  border-radius: 8px; /* Rounded square with slight curve */
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(255, 255, 255, 0.5); /* 3D effect */
   position: relative;
   overflow: hidden;
 
-  span {
-    font-size: 18px;
-    font-weight: 600;
+  svg {
+    width: 22px; /* Adjusted for larger button */
+    height: 22px;
   }
 
   &:before {
@@ -61,15 +61,16 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
     transition: 0.5s;
   }
 
   &:hover:not(:disabled) {
-    background: #edf2ff;
-    transform: scale(1.1) rotate(5deg);
+    background: linear-gradient(145deg, #edf2ff 0%, #d6deff 100%); /* Gradient on hover */
+    transform: scale(1.1) translateY(-2px);
     color: #1a73e8;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2), 0 0 10px rgba(74, 144, 226, 0.5); /* Glow effect */
+    animation: pulse 1.5s infinite ease-in-out;
 
     &:before {
       left: 100%;
@@ -77,39 +78,54 @@
   }
 
   &:disabled {
-    background: #d1d9e0;
+    background: linear-gradient(145deg, #d1d9e0 0%, #c4ccd3 100%);
     cursor: not-allowed;
     opacity: 0.6;
     transform: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(74, 144, 226, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 10px rgba(74, 144, 226, 0.5);
   }
 }
 
 .zoom-button {
-  &.zoom-in span {
-    font-size: 20px;
-    line-height: 1;
+  width: 52px; /* Increased from 48px */
+  height: 52px; /* Increased from 48px */
+
+  &.zoom-in svg {
+    width: 28px; /* Adjusted for larger button */
+    height: 28px;
   }
 
-  &.zoom-out span {
-    font-size: 20px;
-    line-height: 1;
+  &.zoom-out svg {
+    width: 28px; /* Adjusted for larger button */
+    height: 28px;
   }
 }
 
-.fit-button span {
-  font-size: 16px;
+.fit-button svg {
+  width: 22px;
+  height: 22px;
 }
 
-.rotate-button span {
-  font-size: 18px;
+.rotate-button svg {
+  width: 22px;
+  height: 22px;
 }
 
-.fullscreen-button span {
-  font-size: 16px;
-}
-
-.download-button span {
-  font-size: 18px;
+.download-button svg {
+  width: 22px;
+  height: 22px;
 }
 
 .page-info {
@@ -157,28 +173,29 @@
   }
 
   button {
-    width: 36px;
-    height: 36px;
+    width: 40px; /* Slightly increased to match new nav-button size */
+    height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #ffffff;
+    background: linear-gradient(145deg, #ffffff 0%, #e6e6e6 100%);
     color: #2d3748;
     border: none;
-    border-radius: 50%;
+    border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15), inset 0 2px 4px rgba(255, 255, 255, 0.5);
 
     span {
       font-size: 16px;
     }
 
     &:hover {
-      background: #edf2ff;
-      transform: scale(1.1);
+      background: linear-gradient(145deg, #edf2ff 0%, #d6deff 100%);
+      transform: scale(1.1) translateY(-2px);
       color: #1a73e8;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2), 0 0 10px rgba(74, 144, 226, 0.5);
+      animation: pulse 1.5s infinite ease-in-out;
     }
   }
 }
