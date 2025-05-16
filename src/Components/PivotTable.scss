@@ -115,6 +115,25 @@
   z-index: 5;
 }
 
+.data-cell {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.checked-cell {
+  background-color: #8bd38d !important; /* Green */
+  color: white;
+}
+
+.unchecked-cell {
+  background-color: #d68a86 !important; /* Red */
+  color: white;
+}
+
 /* Scrollbar customization */
 .pivot-table-container::-webkit-scrollbar {
   width: 10px;

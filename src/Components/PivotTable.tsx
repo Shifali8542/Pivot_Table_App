@@ -1,5 +1,4 @@
-
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import './PivotTable.scss';
 
 interface PivotDataItem {
@@ -19,6 +18,8 @@ interface PivotTableProps {
 const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
   const [sortField, setSortField] = useState<string>('row_header_input');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // Track checked cells by their cellId
+  const [checkedCells, setCheckedCells] = useState<Set<string>>(new Set());
 
   // Process data to create pivot structure
   const pivotData = useMemo(() => {
@@ -74,6 +75,19 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
     }
   };
 
+  // Handle cell click and track checked cells
+  const handleCellClick = (cellId: string, ltrb: [number, number, number, number]) => {
+    // Mark this cellId as checked
+    setCheckedCells(prev => {
+      const newSet = new Set(prev);
+      newSet.add(cellId);
+      return newSet;
+    });
+    
+    // Call the parent onCellClick handler
+    onCellClick?.(cellId, ltrb);
+  };
+
   return (
     <div className="pivot-table-container">
       <table className="pivot-table">
@@ -93,20 +107,28 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
           {sortedRows.map(row => (
             <tr key={row}>
               <td>{row}</td>
-              {pivotData.columns.map(col => (
-                <td
-                  key={`${row}-${col}`}
-                  onClick={() =>
-                    onCellClick?.(
-                      pivotData.aggregated[row]?.[col]?.cellId || '',
-                      pivotData.aggregated[row]?.[col]?.ltrb
-                    )
-                  }
-                  className="data-cell"
-                >
-                  {pivotData.aggregated[row]?.[col]?.formatted || '-'}
-                </td>
-              ))}
+              {pivotData.columns.map(col => {
+                const cellData = pivotData.aggregated[row]?.[col];
+                const cellId = cellData?.cellId || '';
+                const isChecked = checkedCells.has(cellId);
+                const hasValue = cellData && cellData.formatted !== '-';
+                
+                return (
+                  <td
+                    key={`${row}-${col}`}
+                    onClick={() =>
+                      cellData && 
+                      handleCellClick(
+                        cellId,
+                        cellData.ltrb
+                      )
+                    }
+                    className={`data-cell ${hasValue ? (isChecked ? 'checked-cell' : 'unchecked-cell') : ''}`}
+                  >
+                    {cellData?.formatted || '-'}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
