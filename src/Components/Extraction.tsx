@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import PivotTable from './PivotTable';
 import Pdf from './Pdf';
 import Navbar from './Navbar';
-import CompanyCards from './CompanyCard';
 import rawData from '../data/sampleData.json';
 import './Extraction.scss';
+import { useMemo } from 'react';
 
 const sampleData = rawData as any;
 
@@ -37,7 +37,8 @@ const Extraction: React.FC = () => {
   const [lastLayoutState, setLastLayoutState] = useState<{
     pdfWidth: number;
     layoutOrder: 'pivot-pdf' | 'pdf-pivot';
-  } | null>(null); // Store layout state before hiding
+  } | null>(null);
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
   const dividerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const draggedSectionRef = useRef<HTMLDivElement | null>(null);
@@ -103,11 +104,10 @@ const Extraction: React.FC = () => {
     }
   }, [isPivotRendered, isPdfRendered, hasLoggedRenderSuccess]);
 
-  const handleCellClick = (cellId: string, ltrb: [number, number, number, number]) => {
+  const handleCellClick = (cellId: string, ltrb: [number, number, number, number], items: any[]) => {
     console.log(`Clicked Cell ID: ${cellId}`);
     console.log(`LTRB Coordinates:`, ltrb);
-    const allData = pivotData[0]?.data || [];
-    const matchingCell = allData.find((cell: any) => cell.Cell_id === cellId);
+    const matchingCell = items[0]; // Use the first item for navigation
 
     if (matchingCell) {
       console.log('Full Cell Data:', matchingCell);
@@ -119,18 +119,24 @@ const Extraction: React.FC = () => {
       console.log('Raw Value:', matchingCell.Value);
       console.log('Text Value:', matchingCell.data_point_text);
 
+      setSelectedCompany(matchingCell.row_header_input);
+
       setPdfNavigate({
         page: matchingCell.page || 1,
         ltrb: ltrb,
       });
     } else {
       console.warn('No matching cell found!');
+      setSelectedCompany(null);
     }
   };
 
   // Company cards toggle
   const toggleCompanyCards = () => {
     setIsCompanyCardsVisible(!isCompanyCardsVisible);
+    if (isCompanyCardsVisible) {
+      setSelectedCompany(null);
+    }
   };
 
   // Divider drag functionality for resizing
@@ -230,11 +236,9 @@ const Extraction: React.FC = () => {
   // Toggle visibility functions for the navbar buttons
   const togglePdfVisibility = () => {
     if (!isPdfHidden) {
-      // Before hiding, save the current layout state
       setLastLayoutState({ pdfWidth, layoutOrder });
       setIsPdfHidden(true);
     } else {
-      // When showing, restore the last layout state if available
       if (lastLayoutState) {
         setPdfWidth(lastLayoutState.pdfWidth);
         setLayoutOrder(lastLayoutState.layoutOrder);
@@ -245,11 +249,9 @@ const Extraction: React.FC = () => {
 
   const togglePivotVisibility = () => {
     if (!isPivotHidden) {
-      // Before hiding, save the current layout state
       setLastLayoutState({ pdfWidth, layoutOrder });
       setIsPivotHidden(true);
     } else {
-      // When showing, restore the last layout state if available
       if (lastLayoutState) {
         setPdfWidth(lastLayoutState.pdfWidth);
         setLayoutOrder(lastLayoutState.layoutOrder);
@@ -261,13 +263,12 @@ const Extraction: React.FC = () => {
   // Adjust pdfWidth based on visibility states, but only when hiding
   useEffect(() => {
     if (isPdfHidden && isPivotHidden) {
-      // If both are hidden, do not modify pdfWidth (preserve last state)
+      // Do nothing to preserve lastLayoutState
     } else if (isPdfHidden) {
-      setPdfWidth(0); // Maximize pivot table
+      setPdfWidth(0);
     } else if (isPivotHidden) {
-      setPdfWidth(100); // Maximize PDF
+      setPdfWidth(100);
     }
-    // Removed the reset to 50/50 when both are hidden to preserve lastLayoutState
   }, [isPdfHidden, isPivotHidden]);
 
   // Render sections based on layout order and visibility
@@ -350,34 +351,14 @@ const Extraction: React.FC = () => {
         isPivotHidden={isPivotHidden}
         onToggleCompanyCards={toggleCompanyCards}
         isCompanyCardsVisible={isCompanyCardsVisible}
+        companies={companyData}
+        selectedCompany={selectedCompany}
       />
       <div className="extraction-container" ref={containerRef}>
         {renderSections()}
-        {isCompanyCardsVisible && (
-          <CompanyCards 
-            companies={companyData} 
-            onClose={toggleCompanyCards} 
-          />
-        )}
       </div>
     </div>
   );
 };
 
 export default Extraction;
-
-// Simple implementation of useMemo for this context
-function useMemo<T>(factory: () => T, deps: any[]): T {
-  const ref = useRef<{ value: T; deps: any[] } | null>(null);
-
-  if (
-    !ref.current ||
-    ref.current.deps.length !== deps.length ||
-    ref.current.deps.some((dep, i) => dep !== deps[i])
-  ) {
-    ref.current = { value: factory(), deps };
-  }
-
-  return ref.current.value;
-}
-

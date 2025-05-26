@@ -48,8 +48,6 @@
   }
 }
 
-/* Add these styles to your existing Navbar.scss file */
-
 .company-button {
   position: relative;
   display: flex;
@@ -70,4 +68,157 @@
     background-color: #0056b3;
     color: white;
   }
+}
+
+// Updated styles for company cards
+.company-cards-container {
+  position: absolute;
+  top: 60px;
+  left: 10px;
+  width: 320px;
+  max-height: calc(100vh - 80px);
+  background-color: #f5f7fa;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.company-cards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  
+  h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #333;
+  }
+  
+  .close-button {
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    cursor: pointer;
+    padding: 0 5px;
+    color: #666;
+    
+    &:hover {
+      color: #dc3545;
+    }
+  }
+}
+
+.company-cards-list {
+  padding: 12px;
+  overflow-y: auto;
+}
+
+.company-card {
+  background-color: #ffffff;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+  
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.company-card-header {
+  background: linear-gradient(to right, #f0f4f8, #e8ecef);
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.company-name {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2d3748;
+  text-transform: capitalize;
+}
+
+.company-card-body {
+  padding: 12px 16px;
+}
+
+.company-total-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #e3f2fd;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+.company-total-label {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #555;
+}
+
+.company-total-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e88e5;
+}
+
+.company-values-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.company-value-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px dashed #e0e0e0;
+}
+
+.company-value-column {
+  font-size: 0.9rem;
+  color: #666;
+  flex: 1;
+}
+
+.company-value-data {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+  text-align: right;
+}
+
+.no-companies {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 0.95rem;
 }

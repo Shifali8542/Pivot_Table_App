@@ -5,14 +5,9 @@
   background: linear-gradient(135deg, #f5f7fa 0%, #e4e9f0 100%);
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
-  overflow-x: auto; // Enable horizontal scrolling
-  overflow-y: auto; // Enable vertical scrolling
-  transition: transform 0.3s ease-in-out;
+  overflow-x: auto;
+  overflow-y: auto;
   box-sizing: border-box;
-
-  &:hover {
-    transform: translateY(-4px);
-  }
 }
 
 .pivot-table {
@@ -22,7 +17,7 @@
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   border-radius: 8px;
-  min-width: max-content; // Ensure table can grow wider than container to trigger horizontal scrolling
+  min-width: max-content;
 }
 
 .pivot-table th,
@@ -30,7 +25,6 @@
   padding: 12px 16px;
   border: 1px solid #d1d9e0;
   text-align: left;
-  transition: background-color 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -71,7 +65,6 @@
   &:hover {
     background-color: #edf2ff;
     color: #1a73e8;
-    transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   }
 
@@ -95,8 +88,6 @@
 }
 
 .pivot-table tbody tr {
-  transition: background-color 0.2s ease;
-
   &:nth-child(even) {
     background-color: #f8fafc;
   }
@@ -117,21 +108,97 @@
 
 .data-cell {
   cursor: pointer;
-  transition: background-color 0.2s ease;
-  
-  &:hover {
-    opacity: 0.8;
-  }
 }
 
-.checked-cell {
+.single-value {
   background-color: #8bd38d !important; /* Green */
   color: white;
 }
 
-.unchecked-cell {
+.multiple-values {
   background-color: #d68a86 !important; /* Red */
   color: white;
+
+   &:hover {
+    background-color: #c67872 !important;
+  }
+}
+
+.dropdown-active {
+  background-color: #e6f0ff !important;
+  border-color: #4a90e2 !important;
+}
+
+
+.cell-content {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.multiple-indicator {
+  background: rgba(0, 0, 0, 0.3);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  
+  &:hover {
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.3);
+  }
+}
+
+.dropdown {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  min-width: 200px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: block; /* Ensure always visible when rendered */
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  white-space: nowrap;
+
+  &:hover {
+    background-color: #edf2ff;
+    color: #1a73e8;
+  }
+}
+
+.validated {
+  background-color: #e6ffed !important;
+}
+
+.not-validated {
+  background-color: #fff1f0 !important;
+}
+
+.dropdown-item input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+.dropdown-value {
+  flex: 1;
 }
 
 /* Scrollbar customization */
@@ -148,9 +215,34 @@
 .pivot-table-container::-webkit-scrollbar-thumb {
   background: #4a90e2;
   border-radius: 5px;
-  transition: background 0.3s ease;
 }
 
 .pivot-table-container::-webkit-scrollbar-thumb:hover {
   background: #3a78c2;
+}
+
+.dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown::-webkit-scrollbar-track {
+  background: #e4e9f0;
+  border-radius: 3px;
+}
+
+.dropdown::-webkit-scrollbar-thumb {
+  background: #4a90e2;
+  border-radius: 3px;
+}
+
+.dropdown::-webkit-scrollbar-thumb:hover {
+  background: #3a78c2;
+}
+
+/* Cursor consistency */
+.data-cell:hover,
+.multiple-indicator,
+.dropdown-item:hover,
+.dropdown-item input[type="checkbox"]:hover {
+  cursor: pointer !important;
 }

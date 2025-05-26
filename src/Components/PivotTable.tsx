@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import './PivotTable.scss';
 
 interface PivotDataItem {
@@ -8,29 +8,52 @@ interface PivotDataItem {
   Cell_id: string;
   _data_point_ltrb: [number, number, number, number];
   Value?: number;
+  page?: number;
 }
 
 interface PivotTableProps {
   data: { data: PivotDataItem[] }[];
-  onCellClick?: (cellId: string, ltrb: [number, number, number, number]) => void;
+  onCellClick?: (cellId: string, ltrb: [number, number, number, number], values: PivotDataItem[]) => void;
 }
 
 const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
   const [sortField, setSortField] = useState<string>('row_header_input');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  // Track checked cells by their cellId
-  const [checkedCells, setCheckedCells] = useState<Set<string>>(new Set());
+  const [dropdownCell, setDropdownCell] = useState<{
+    cellId: string;
+    row: string;
+    col: string;
+    values: PivotDataItem[];
+    top: number;
+    left: number;
+  } | null>(null);
+  const [validatedCells, setValidatedCells] = useState<{ [cellId: string]: boolean }>({});
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const cellRefs = useRef<Map<string, HTMLTableCellElement>>(new Map());
 
   // Process data to create pivot structure
   const pivotData = useMemo(() => {
     const flatData = data[0]?.data || [];
     
+    // Log raw data for debugging
+    console.log('Raw flatData:', flatData);
+
     // Extract unique rows and columns
     const rows = Array.from(new Set(flatData.map(item => item.row_header_input))).sort();
     const columns = Array.from(new Set(flatData.map(item => item.col_header_input))).sort();
 
-    // Aggregate values
-    const aggregated: { [row: string]: { [col: string]: { value: number; cellId: string; formatted: string; ltrb: [number, number, number, number]; } } } = {};
+    // Aggregate values and track multiple items
+    const aggregated: {
+      [row: string]: {
+        [col: string]: {
+          value: number;
+          cellId: string;
+          formatted: string;
+          ltrb: [number, number, number, number];
+          items: PivotDataItem[];
+        };
+      };
+    } = {};
     
     flatData.forEach(item => {
       const row = item.row_header_input;
@@ -46,12 +69,23 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
           value: 0,
           cellId: item.Cell_id,
           formatted: '',
-          ltrb: item._data_point_ltrb
+          ltrb: item._data_point_ltrb,
+          items: [],
         };
       }
       aggregated[row][col].value += value;
       aggregated[row][col].formatted = `€${aggregated[row][col].value.toLocaleString()}`;
-      aggregated[row][col].cellId = item.Cell_id;
+      // Ensure unique items by Cell_id
+      if (!aggregated[row][col].items.some(existing => existing.Cell_id === item.Cell_id)) {
+        aggregated[row][col].items.push({ ...item });
+      }
+    });
+
+    // Log aggregated items for debugging
+    Object.keys(aggregated).forEach(row => {
+      Object.keys(aggregated[row]).forEach(col => {
+        console.log(`Cell [${row}, ${col}] items:`, aggregated[row][col].items);
+      });
     });
 
     return { rows, columns, aggregated };
@@ -75,18 +109,79 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
     }
   };
 
-  // Handle cell click and track checked cells
-  const handleCellClick = (cellId: string, ltrb: [number, number, number, number]) => {
-    // Mark this cellId as checked
-    setCheckedCells(prev => {
-      const newSet = new Set(prev);
-      newSet.add(cellId);
-      return newSet;
-    });
-    
-    // Call the parent onCellClick handler
-    onCellClick?.(cellId, ltrb);
+  // Handle button click for multiple values
+  const handleButtonClick = (
+    row: string,
+    col: string,
+    cellData: { cellId: string; ltrb: [number, number, number, number]; items: PivotDataItem[] },
+    event: React.MouseEvent<HTMLButtonElement>
+  ) => {
+    event.stopPropagation();
+    const cell = cellRefs.current.get(`${row}-${col}`);
+    if (cell) {
+      const rect = cell.getBoundingClientRect();
+      setDropdownCell({
+        cellId: cellData.cellId,
+        row,
+        col,
+        values: cellData.items,
+        top: rect.bottom + window.scrollY + 2,
+        left: rect.left + window.scrollX,
+      });
+    }
   };
+
+  // Handle cell click for single values
+  const handleCellClick = (
+    row: string,
+    col: string,
+    cellData: { cellId: string; ltrb: [number, number, number, number]; items: PivotDataItem[] },
+    event: React.MouseEvent<HTMLTableCellElement>
+  ) => {
+    event.stopPropagation();
+    if (cellData.items.length === 1) {
+      setDropdownCell(null);
+      onCellClick?.(cellData.cellId, cellData.ltrb, cellData.items);
+    }
+  };
+
+  // Handle validation toggle
+  const handleValidationToggle = (cellId: string, event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    setValidatedCells(prev => ({
+      ...prev,
+      [cellId]: event.target.checked,
+    }));
+  };
+
+  // Handle dropdown item click
+  const handleDropdownItemClick = (item: PivotDataItem, event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    onCellClick?.(item.Cell_id, item._data_point_ltrb, [item]);
+    setDropdownCell(null);
+  };
+
+  // Check if all items in a cell are validated
+  const areAllItemsValidated = (items: PivotDataItem[]) => {
+    return items.length > 0 && items.every(item => validatedCells[item.Cell_id] === true);
+  };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node) &&
+        !(event.target as HTMLElement).closest('.multiple-indicator')
+      ) {
+        setDropdownCell(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <div className="pivot-table-container">
@@ -109,23 +204,67 @@ const PivotTable: React.FC<PivotTableProps> = ({ data, onCellClick }) => {
               <td>{row}</td>
               {pivotData.columns.map(col => {
                 const cellData = pivotData.aggregated[row]?.[col];
-                const cellId = cellData?.cellId || '';
-                const isChecked = checkedCells.has(cellId);
                 const hasValue = cellData && cellData.formatted !== '-';
+                const isMultiple = cellData && cellData.items.length > 1;
+                const allValidated = isMultiple && areAllItemsValidated(cellData.items);
                 
                 return (
                   <td
                     key={`${row}-${col}`}
-                    onClick={() =>
-                      cellData && 
-                      handleCellClick(
-                        cellId,
-                        cellData.ltrb
-                      )
-                    }
-                    className={`data-cell ${hasValue ? (isChecked ? 'checked-cell' : 'unchecked-cell') : ''}`}
+                    ref={(el) => {
+                      if (el) {
+                        cellRefs.current.set(`${row}-${col}`, el);
+                      } else {
+                        cellRefs.current.delete(`${row}-${col}`);
+                      }
+                    }}
+                    onClick={(e) => cellData && handleCellClick(row, col, cellData, e)}
+                    className={`data-cell ${hasValue ? (isMultiple && !allValidated ? 'multiple-values' : 'single-value') : ''} ${
+                      dropdownCell?.row === row && dropdownCell?.col === col ? 'dropdown-active' : ''
+                    }`}
+                    style={{ position: 'relative' }}
                   >
-                    {cellData?.formatted || '-'}
+                    <div className="cell-content">
+                      <span>{cellData?.formatted || '-'}</span>
+                      {isMultiple && (
+                        <button
+                          className="multiple-indicator"
+                          onClick={(e) => cellData && handleButtonClick(row, col, cellData, e)}
+                          title="View multiple values"
+                        >
+                          ▼
+                        </button>
+                      )}
+                    </div>
+                    {dropdownCell?.row === row && dropdownCell?.col === col && (
+                      <div
+                        className="dropdown"
+                        ref={dropdownRef}
+                        style={{
+                          position: 'fixed',
+                          top: `${dropdownCell.top}px`,
+                          left: `${dropdownCell.left}px`,
+                        }}
+                      >
+                        {dropdownCell.values.map((item, index) => (
+                          <div
+                            key={`${item.Cell_id}-${index}`}
+                            className={`dropdown-item ${validatedCells[item.Cell_id] ? 'validated' : 'not-validated'}`}
+                            onClick={(e) => handleDropdownItemClick(item, e)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={!!validatedCells[item.Cell_id]}
+                              onChange={(e) => handleValidationToggle(item.Cell_id, e)}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <span className="dropdown-value">
+                              {item.Value_formatted}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </td>
                 );
               })}
